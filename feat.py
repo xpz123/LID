@@ -8,6 +8,7 @@
 import os
 import sys
 from sys import argv
+from pydub import AudioSegment
 import pdb
 
 def readFile(inputfilename):
@@ -22,7 +23,7 @@ def dealFeat(inputfilename, outputDir):
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
 
-    count = 1
+    count = 0
     for line in totalLines:
         line = line.strip()
 
@@ -31,7 +32,7 @@ def dealFeat(inputfilename, outputDir):
 
         if line.endswith('['):
             inputTempFilename = outputDir + '/' + line.split()[0]
-            f_out = open(inputfilename, 'w', encoding = 'utf-8')
+            f_out = open(inputTempFilename, 'w', encoding = 'utf-8')
             count = count + 1
         elif line.endswith(']'):
             line = line.replace(']', '').strip() + '\n'
@@ -42,6 +43,21 @@ def dealFeat(inputfilename, outputDir):
 
     print(str(count) + ' files have been writted!')
 
+def load_pcm(pcmfile, framerate=16000, samplewidth=2, channel=1):
+   return AudioSegment.from_raw(pcmfile, frame_rate=framerate, sample_width=samplewidth, channels=channel)
+
+
+def seg_audio(audio, seglen=3000):
+    duration = len(audio)
+    segs = duration / seglen
+    audio_list = list()
+    for i in range(segs):
+        audio_list.append(audio[i*seglen:(i+1)*seglen])
+    return audio_list
+
+
+
+
 if __name__ == '__main__':
     argvLen = len(sys.argv)
     if argvLen != 3:
@@ -50,5 +66,5 @@ if __name__ == '__main__':
 
     inputfilename = argv[1]
     outputDir = argv[2]
-    pdb.set_trace()
+    #pdb.set_trace()
     dealFeat(inputfilename, outputDir)
