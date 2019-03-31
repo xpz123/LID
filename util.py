@@ -51,3 +51,16 @@ class LID_Dataset(Dataset):
         label = self.labeldict[utt]
         res = {'feat':feat, 'label':label}
         return res
+
+
+def Load_Dataset(args):
+    print ('Load training dataset...')
+    train_dataset = LID_Dataset(args.train_feat_list, args.train_label_list, args.feat_dir)
+    dev_dataset = LID_Dataset(args.dev_feat_list, args.dev_label_list, args.feat_dir)
+    test_dataset = LID_Dataset(args.test_feat_list, args.test_label_list, args.feat_dir)
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    dev_dataloader = DataLoader(dataset=dev_dataset, batch_size=args.batch_size, shuffle=True)
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=True)
+    return train_dataloader.__iter__(), dev_dataloader.__iter__(), test_dataloader.__iter__
+
+
