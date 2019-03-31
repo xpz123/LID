@@ -64,7 +64,7 @@ class LID_Utt(nn.Model):
             for fc_layer in self.fc_list:
                 mid_fc_outputs = fc_layer(mid_fc_outputs)
         final_fc_outputs = self.fc_output(mid_fc_outputs)
-        outputs = self.softmax(final_fc_outputs)
+        outputs = self.LogSoftmax(final_fc_outputs)
         return outputs
 
 class LID(nn.Model):
