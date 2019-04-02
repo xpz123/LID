@@ -64,5 +64,16 @@ class LID_Utt(nn.Model):
             for fc_layer in self.fc_list:
                 mid_fc_outputs = fc_layer(mid_fc_outputs)
         final_fc_outputs = self.fc_output(mid_fc_outputs)
-        outputs = self.softmax(final_fc_outputs)
+        outputs = self.LogSoftmax(final_fc_outputs)
+        return outputs
+
+class LID(nn.Model):
+    def __init__(self, LID_Frame, LID_Utt):
+        super(LID, self).__init__()
+        self.LID_Frame = LID_Frame
+        self.LID_Utt = LID_Utt
+
+    def forword(self, inputs):
+        frame_outputs = self.LID_Frame(inputs)
+        outputs = self.LID_Utt(frame_outputs)
         return outputs
