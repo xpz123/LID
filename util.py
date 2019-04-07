@@ -3,12 +3,30 @@ import os
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
+import pdb
+
+#Frame shift 300 for numpy, means 3s for wav. 
+def split_mat(mat, frameshift=300, initframe=300, endframe=300):
+    numframes = mat.shape[1]
+    remainderframe = numframes % frameshift
+    leftframe = numframes - remainderframe
+    if remainderframe >= (0.5 * endframe):
+        realendframe = remainderframe
+    else:
+        realendframe = endframe + remainderframe
+    numsplits = (numframes - realendframe - initframe) / frameshift
+    return np.split(mat[:,initframe:numframes - realendframe], numsplits, 1)
+
+
+
+    
+
 class LID_Dataset(Dataset):
     def fix_data(self):
         featset = set()
         labelset = set()
         for feat in self.featlist:
-            featset.add(feat)
+            featset.add(feat.strip())
         for labelutt in self.labeldict.keys():
             labelset.add(labelutt)
         leftset = featset & labelset
@@ -28,11 +46,11 @@ class LID_Dataset(Dataset):
         labellist = open(labelfile).readlines()
         self.labeldict = dict()
         failcount = 0
-        for label in lablelist:
+        for label in labellist:
             try:
                 utt = label.split()[0]
                 label = int(label.split()[1])
-                labeldict[utt] = label
+                self.labeldict[utt] = label
             except:
                 failcount += 1
         print ('Failcount for load labeldict is: ' + str(failcount))
@@ -47,7 +65,9 @@ class LID_Dataset(Dataset):
 
     def __getitem__(self, index):
         utt = self.featlist[index]
-        feat = np.loadtxt(os.path.join(self.featdir, utt))
+        #feat = np.loadtxt(os.path.join(self.featdir, utt))
+        feat = np.load(os.path.join(self.featdir, utt + '.npy'))
+        feat = feat.T
         label = self.labeldict[utt]
         res = {'feat':feat, 'label':label}
         return res
