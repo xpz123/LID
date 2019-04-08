@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import pdb
 
 #Frame shift 300 for numpy, means 3s for wav. 
-def split_mat(mat, frameshift=300, initframe=300, endframe=300):
+def split_mat(mat, frameshift=200, initframe=200, endframe=200):
     numframes = mat.shape[1]
     remainderframe = numframes % frameshift
     leftframe = numframes - remainderframe

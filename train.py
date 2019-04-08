@@ -12,12 +12,14 @@ import argparse
 import torch
 from torch import optim
 from torch.autograd import Variable
-from torch.nn.utils import clip_grad_norm
+from torch.nn.utils import clip_grad_norm_
 from torch.nn import functional as F
 from model import LID_Frame, LID_Utt, LID
 from util import Load_Dataset
+import util
 import pdb
 from collections import Counter
+import numpy as np
 
 def parse_arguments():
     p = argparse.ArgumentParser(description='Hyperparams')
@@ -27,7 +29,7 @@ def parse_arguments():
                    help='number of epochs for train')
     p.add_argument('-lr', type=float, default=0.0001,
                    help='initial learning rate')
-    p.add_argument('-grad_clip', type=float, default=10.0,
+    p.add_argument('-grad_clip', type=float, default=1.0,
                    help='in case of gradient explosion')
     p.add_argument('-input_size', type=int, default=13,
                    help='the size of input feature.')
@@ -70,8 +72,12 @@ def evaluate(model, val_iter):
     for b, batch in enumerate(val_iter):
         feat = batch['feat'].permute(1,0,2).float()
         label = batch['label']
-        feat = Variable(feat.data.cuda(), volatile=True)
-        label = Variable(label.data.cuda(), volatile=True)
+        #feat = Variable(feat.data.cuda(), volatile=True)
+        #label = Variable(label.data.cuda(), volatile=True)
+        with torch.no_grad():
+            feat = Variable(feat.data.cuda())
+        with torch.no_grad():
+            label = Variable(label.data.cuda())
         output = model(feat)
         loss = F.nll_loss(output, label)
         total_loss += loss.data
@@ -81,13 +87,15 @@ def test(model, test_feats, test_labels=None):
     featsfile = open(test_feats).readlines()
     test_hyps = list()
     for featfile in featsfile:
+        featfile = featfile.strip()
         feats = np.load(featfile)
         featslist = util.split_mat(feats)
         label_temp = list()
         for shortfeat in featslist:
             model.eval()
-            shortfeat_tensor = torch.from_numpy(shortfeat)
-            shortfeat_tensor = Variable(shortfeat_tensor.data.cuda(), volatile=True)
+            shortfeat_tensor = torch.from_numpy(shortfeat.T[:, np.newaxis, :]).float()
+            with torch.no_grad():
+                shortfeat_tensor = Variable(shortfeat_tensor.data.cuda())
             output = model(shortfeat_tensor)
             pred = output.data.max(1)[1]
             label_temp.append(pred)
@@ -110,16 +118,15 @@ def test(model, test_feats, test_labels=None):
             print('length of yhe test output != length of the labels.')
             return
         for i in range(len(test_hyps)):
-            if test_hyps[i] == labels[i]:
+            if test_hyps[i] == int(labels[i].strip()):
                 correct = correct + 1
 
         print('Accuracy: ' + str(round(correct / len(test_hyps), 3)))
             
 
-def train(e, model, optimizer, train_iter, grad_clip):
+def train(e, model, optimizer, train_iter, val_iter, grad_clip):
     model.train()
     total_loss = 0
-    #pdb.set_trace()
     for b, batch in enumerate(train_iter):
         feat = batch['feat'].permute(1,0,2).float()
         label = batch['label']
@@ -128,14 +135,16 @@ def train(e, model, optimizer, train_iter, grad_clip):
         output = model(feat)
         loss = F.nll_loss(output, label)
         loss.backward()
-        clip_grad_norm(model.parameters(), grad_clip)
+        clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
         total_loss += loss.data
 
         if b % 100 == 0 and b != 0:
             total_loss = total_loss / 100
-            print("[%d] [loss: %5.2f]" % (b, total_loss))
+            print("[%d] [loss: %5.4f]" % (b, total_loss))
             total_loss = 0
+            val_loss = evaluate(model, val_iter)
+            print("[%d] [Val_loss: %5.4f]" %(b, total_loss))
 
 
 def main():
@@ -147,7 +156,7 @@ def main():
     
     print("Instantiating models......")
     lid_frame = LID_Frame(args.input_size, args.hidden_size_RNN, args.hidden_size_FC,
-                    n_layers_RNN=args.n_layers_RNN, n_layers_FC=args.n_layers_FC, dropout=0.3)
+                    n_layers_RNN=args.n_layers_RNN, n_layers_FC=args.n_layers_FC, dropout=0.5)
     hidden_size_list_utt = args.hidden_size_list.split(' ')
     hidden_size_list_utt_int = list()
     for size in hidden_size_list_utt:
@@ -167,16 +176,16 @@ def main():
         return
 
     print("Preparing dataset......")
-    train_iter, val_iter, test_iter = Load_Dataset(args)
 
     best_val_loss = None
     for e in range(1, args.epochs+1):
-        train(e, lid, optimizer, train_iter, args.grad_clip)
+        train_iter, val_iter, test_iter = Load_Dataset(args)
+        train(e, lid, optimizer, train_iter, val_iter, args.grad_clip)
         val_loss = evaluate(lid, val_iter)
-        print("[Epoch:%d] val_loss:%5.3f" % (e, val_loss))
+        print("[Epoch:%d] val_loss:%5.4f" % (e, val_loss))
         
         with open(r'log/' + 'train.' + str(e) + '.log', 'w') as fw:
-            fw.write("[Epoch:%d] val_loss:%5.3f" % (e, val_loss))
+            fw.write("[Epoch:%d] val_loss:%5.4f" % (e, val_loss))
             fw.write("\n")
 
         # Save the model if the validation loss is the best we've seen so far.
