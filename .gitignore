@@ -1,2 +1,9 @@
-feat
 data
+submit_lid
+keras_lid/model
+keras_lid/data
+keras_lid/data.bk2
+keras_lid/__pycache__
+keras_lid/result_*
+keras_lid/*.pyc
+train
