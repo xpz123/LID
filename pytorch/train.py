@@ -65,23 +65,31 @@ def parse_arguments():
                    help='just test.')
     return p.parse_args()
 
-
 def evaluate(model, val_iter):
     model.eval()
     total_loss = 0
+    total_acc = 0.0
     for b, batch in enumerate(val_iter):
         feat = batch['feat'].permute(1,0,2).float()
         label = batch['label']
-        #feat = Variable(feat.data.cuda(), volatile=True)
-        #label = Variable(label.data.cuda(), volatile=True)
         with torch.no_grad():
             feat = Variable(feat.data.cuda())
         with torch.no_grad():
             label = Variable(label.data.cuda())
+
         output = model(feat)
+        output = output.reshape(-1, 3)
+        #label = torch.transpose(label, 1, 0)
+        label = label.reshape(-1).long()
+
         loss = F.nll_loss(output, label)
+        total_acc += calAccuracy(output, label)
+        if b == 0:
+            np.savetxt('tmp_output.txt', output.data.max(1)[1].cpu())
+            np.savetxt('tmp_label.txt', label.data.cpu())
         total_loss += loss.data
-    return total_loss / len(val_iter)
+
+    return total_loss / len(val_iter), total_acc / len(val_iter)
 
 def test(model, test_feats, test_labels=None):
     featsfile = open(test_feats).readlines()
@@ -124,15 +132,28 @@ def test(model, test_feats, test_labels=None):
         print('Accuracy: ' + str(round(correct / len(test_hyps), 3)))
             
 
-def train(e, model, optimizer, train_iter, val_iter, grad_clip):
+#给定output和label计算帧准确率
+def calAccuracy(output, label):
+    pred = output.data.max(1)[1]
+    right = float((label == pred).sum().cpu())
+    return right / float(label.size()[0])
+
+
+def train(e, model, optimizer, train_loader, val_loader, grad_clip):
     model.train()
     total_loss = 0
+    train_iter = train_loader.__iter__()
+    pdb.set_trace()
     for b, batch in enumerate(train_iter):
+        model.train()
         feat = batch['feat'].permute(1,0,2).float()
         label = batch['label']
         feat, label = feat.cuda(), label.cuda()
+       
         optimizer.zero_grad()
         output = model(feat)
+        label = label.reshape(-1).long()
+        output = output.reshape(-1, 3)
         loss = F.nll_loss(output, label)
         loss.backward()
         clip_grad_norm_(model.parameters(), grad_clip)
@@ -143,8 +164,9 @@ def train(e, model, optimizer, train_iter, val_iter, grad_clip):
             total_loss = total_loss / 100
             print("[%d] [loss: %5.4f]" % (b, total_loss))
             total_loss = 0
-            val_loss = evaluate(model, val_iter)
-            print("[%d] [Val_loss: %5.4f]" %(b, total_loss))
+            #val_iter = val_loader.__iter__()
+            #val_loss = evaluate(model, val_iter)
+            #print("[%d] [Val_loss: %5.4f]" %(b, val_loss))
 
 
 def main():
@@ -161,9 +183,10 @@ def main():
     hidden_size_list_utt_int = list()
     for size in hidden_size_list_utt:
         hidden_size_list_utt_int.append(int(size))
-    lid_utt = LID_Utt(args.hidden_size_FC * 2, args.output_size, hidden_size_list_utt_int)
+    lid_utt = LID_Utt(args.hidden_size_FC, args.output_size, hidden_size_list_utt_int)
     lid = LID(lid_frame, lid_utt).cuda()
-    optimizer = optim.Adam(lid.parameters(), lr=args.lr)
+    #optimizer = optim.Adam(lid.parameters(), lr=args.lr)
+    optimizer = optim.SGD(lid.parameters(), lr=args.lr)
     print(lid)
     
     if args.isTest:
@@ -179,10 +202,10 @@ def main():
 
     best_val_loss = None
     for e in range(1, args.epochs+1):
-        train_iter, val_iter, test_iter = Load_Dataset(args)
-        train(e, lid, optimizer, train_iter, val_iter, args.grad_clip)
-        val_loss = evaluate(lid, val_iter)
-        print("[Epoch:%d] val_loss:%5.4f" % (e, val_loss))
+        train_loader, val_loader, test_loader = Load_Dataset(args)
+        train(e, lid, optimizer, train_loader, val_loader, args.grad_clip)
+        val_loss, val_acc = evaluate(lid, val_loader.__iter__())
+        print("[Epoch:%d] val_loss:%5.4f  val_accuracy:%5.4f" % (e, val_loss, val_acc))
         
         with open(r'log/' + 'train.' + str(e) + '.log', 'w') as fw:
             fw.write("[Epoch:%d] val_loss:%5.4f" % (e, val_loss))

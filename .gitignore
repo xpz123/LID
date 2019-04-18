@@ -1,7 +1,9 @@
-feat
 data
-data.200
-data.bk
-log
-save
-*.pyc
+submit_lid
+keras_lid/model
+keras_lid/data
+keras_lid/data.bk2
+keras_lid/__pycache__
+keras_lid/result_*
+keras_lid/*.pyc
+train

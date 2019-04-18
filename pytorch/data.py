@@ -8,7 +8,8 @@ import pdb
 
 if __name__ == '__main__':
     rootdir = r'data'
-    subdirs = ['train', 'valid']
+    #subdirs = ['train', 'valid']
+    subdirs = ['kaldi']
     langdirs = ['english', 'hindi', 'mandarin']
 
     langdic = dict()
@@ -24,7 +25,7 @@ if __name__ == '__main__':
             for r, dirs, files in os.walk(langpath):
                 for f in files:
                     try:
-                        oriname = lang + '.' + f.split('.')[0]
+                        oriname = lang + '.' + f.split('.')[1]
                         mat = np.load(os.path.join(r, f))
                         cutmats = util.split_mat(mat)
                         for i in range(len(cutmats)):
